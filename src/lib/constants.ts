@@ -1,8 +1,8 @@
 export const PQL_STATUSES = {
   pending: { label: 'Potential', color: 'bg-warning text-warning-foreground' },
   qualified: { label: 'Qualified', color: 'bg-success text-success-foreground' },
-  // Use a neutral background with red text/icon for unfit
-  rejected: { label: 'Unfit', color: 'bg-muted text-destructive' },
+  // Unfit: red text/icon only, no background pill
+  rejected: { label: 'Unfit', color: 'text-destructive' },
 } as const;
 
 export type PqlStatus = keyof typeof PQL_STATUSES;
