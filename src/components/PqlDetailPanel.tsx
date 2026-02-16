@@ -69,7 +69,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
   const handleReject = async () => {
     await updateStatus.mutateAsync({ id: pqlId, status: 'rejected' });
     await logActivity.mutateAsync({ pql_id: pqlId, action: 'rejected' });
-    toast({ title: 'PQL rejected' });
+    toast({ title: 'Marked as unfit' });
     onClose();
   };
 
@@ -84,12 +84,21 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
   const companyInfo = enrichment?.company_info as Record<string, unknown> | null;
   const keyContacts = enrichment?.key_contacts as Array<Record<string, unknown>> | null;
+  const raw = (pql.raw_data || {}) as Record<string, any>;
+  const companyDisplay =
+    pql.company_name ||
+    raw['Company Name'] ||
+    raw['Company name'] ||
+    raw.Company ||
+    raw.company_name ||
+    raw.company ||
+    pql.email;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">{pql.company_name || pql.email}</h2>
+          <h2 className="text-lg font-semibold">{companyDisplay}</h2>
           <StatusBadge status={pql.status} />
         </div>
         <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>

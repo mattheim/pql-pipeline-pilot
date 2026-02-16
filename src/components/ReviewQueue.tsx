@@ -46,6 +46,14 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
               >
                 {(() => {
                   const raw = (pql.raw_data || {}) as Record<string, any>;
+                  const companyDisplay =
+                    pql.company_name ||
+                    raw['Company Name'] ||
+                    raw['Company name'] ||
+                    raw.Company ||
+                    raw.company_name ||
+                    raw.company ||
+                    '—';
                   const lastActiveRaw =
                     raw['Last Active'] ??
                     raw.last_active ??
@@ -58,7 +66,7 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
                       : '—');
                   return (
                     <>
-                      <TableCell className="font-medium">{pql.company_name || '—'}</TableCell>
+                      <TableCell className="font-medium">{companyDisplay}</TableCell>
                       <TableCell className="text-muted-foreground">{pql.email}</TableCell>
                       <TableCell>{pql.product_usage_score ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground">{lastActiveDisplay}</TableCell>

@@ -33,7 +33,8 @@ export default function Dashboard() {
         </Select>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
+      {/* Layout: ~40% list on the left, ~60% detail on the right */}
+      <div className="grid gap-6 lg:grid-cols-[40%_60%]">
         <ReviewQueue
           onSelect={setSelectedPql}
           selectedId={selectedPql}

@@ -87,6 +87,8 @@ export function CsvUploader() {
             (row as any).company_name ||
             (row as any).Company ||
             (row as any).company ||
+            (row as any)['Company Name'] ||
+            (row as any)['Company name'] ||
             null,
           product_usage_score: usageNum,
           // Only send values that are already in a date-like field.
