@@ -45,19 +45,62 @@ export function CsvUploader() {
     if (file) handleFile(file);
   }, [handleFile]);
 
+  const handleTestAgentsApi = async () => {
+    try {
+      const resp = await fetch(`${AGENTS_API_BASE_URL}/llm-test`);
+      if (!resp.ok) throw new Error(`Status ${resp.status}`);
+      const data = await resp.json();
+      console.log('LLM test result:', data);
+      toast({ title: 'Agents API OK', description: 'Successfully called LLM via Agents API.' });
+    } catch (e: any) {
+      toast({
+        title: 'Agents API test failed',
+        description: e.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleImportAndProcess = async () => {
     if (rows.length === 0) return;
     setProcessing(true);
     try {
       // Map CSV rows to PQL records
-      const pqlRows = rows.map((row) => ({
-        email: row.email || row.Email || '',
-        company_name: row.company_name || row.Company || row.company || null,
-        product_usage_score: Number(row.product_usage_score || row.score || 0) || null,
-        last_active_date: row.last_active_date || row.last_active || null,
-        raw_data: row as any,
-        status: 'pending' as const,
-      }));
+      const pqlRows = rows.map((row) => {
+        // Normalize usage score across different possible header labels
+        const usageRaw =
+          (row as any).product_usage_score ??
+          (row as any).usage_score ??
+          (row as any).score ??
+          (row as any)['Usage Score (1-10)'] ??
+          (row as any)['Usage Score'] ??
+          null;
+
+        const usageNum =
+          usageRaw !== null && usageRaw !== undefined && usageRaw !== ''
+            ? Number(usageRaw)
+            : null;
+
+        return {
+          email: (row as any).email || (row as any).Email || '',
+          company_name:
+            (row as any).company_name ||
+            (row as any).Company ||
+            (row as any).company ||
+            null,
+          product_usage_score: usageNum,
+          // Only send values that are already in a date-like field.
+          // Free-text values like "2 hours ago" stay in raw_data
+          // (e.g. under the "Last Active" header) and are interpreted
+          // later by the qualification agent.
+          last_active_date:
+            (row as any).last_active_date ??
+            (row as any).last_active ??
+            null,
+          raw_data: row as any,
+          status: 'pending' as const,
+        };
+      });
 
       const inserted = await insertPqls.mutateAsync(pqlRows);
 
@@ -94,6 +137,12 @@ export function CsvUploader() {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={handleTestAgentsApi}>
+          Test Agents API
+        </Button>
+      </div>
+
       {/* Upload Zone */}
       <Card className="border-2 border-dashed border-border shadow-none">
         <CardContent className="p-0">

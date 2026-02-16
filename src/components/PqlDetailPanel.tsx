@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/StatusBadge';
-import { usePqlDetail, useUpdatePqlStatus, useUpdateEmailDraft, useLogActivity } from '@/hooks/use-pqls';
+import { usePqlDetail, useUpdatePqlStatus, useUpdateEmailDraft, useLogActivity, useDeletePql } from '@/hooks/use-pqls';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Send, XCircle, Building2, Users, Sparkles } from 'lucide-react';
+import { Send, XCircle, Building2, Users, Sparkles, Trash2 } from 'lucide-react';
 
 interface PqlDetailPanelProps {
   pqlId: string;
@@ -19,6 +19,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
   const updateStatus = useUpdatePqlStatus();
   const updateDraft = useUpdateEmailDraft();
   const logActivity = useLogActivity();
+  const deletePql = useDeletePql();
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -54,7 +55,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
       if (error) throw error;
 
-      await updateStatus.mutateAsync({ id: pqlId, status: 'sent' });
+      // Keep status as 'qualified' or 'pending'; sent state is tracked via activity_log
       await logActivity.mutateAsync({ pql_id: pqlId, action: 'email_sent', details: { to: emailDraft.to_email } });
       toast({ title: 'Email sent successfully!' });
       onClose();
@@ -70,6 +71,15 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     await logActivity.mutateAsync({ pql_id: pqlId, action: 'rejected' });
     toast({ title: 'PQL rejected' });
     onClose();
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deletePql.mutateAsync(pqlId);
+      onClose();
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e.message, variant: 'destructive' });
+    }
   };
 
   const companyInfo = enrichment?.company_info as Record<string, unknown> | null;
@@ -151,18 +161,26 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
       {/* Actions */}
       <div className="flex gap-2">
-        {emailDraft && (pql.status === 'ready_for_review' || pql.status === 'approved') && (
+        {emailDraft && pql.status !== 'rejected' && (
           <Button onClick={handleApproveAndSend} disabled={sending} className="flex-1">
             <Send className="mr-2 h-4 w-4" />
             {sending ? 'Sending…' : 'Approve & Send'}
           </Button>
         )}
-        {pql.status !== 'sent' && pql.status !== 'rejected' && (
+        {pql.status !== 'rejected' && (
           <Button variant="outline" onClick={handleReject} className="flex-1 text-destructive hover:text-destructive">
             <XCircle className="mr-2 h-4 w-4" />
             Reject
           </Button>
         )}
+        <Button
+          variant="outline"
+          onClick={handleDelete}
+          className="flex-1 text-destructive hover:text-destructive"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Delete
+        </Button>
       </div>
     </div>
   );

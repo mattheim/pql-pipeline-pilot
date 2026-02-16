@@ -1,10 +1,6 @@
 export const PQL_STATUSES = {
-  pending: { label: 'Pending', color: 'bg-muted text-muted-foreground' },
-  qualified: { label: 'Qualified', color: 'bg-info text-info-foreground' },
-  enriched: { label: 'Enriched', color: 'bg-warning text-warning-foreground' },
-  ready_for_review: { label: 'Ready for Review', color: 'bg-primary text-primary-foreground' },
-  approved: { label: 'Approved', color: 'bg-success text-success-foreground' },
-  sent: { label: 'Sent', color: 'bg-success text-success-foreground' },
+  pending: { label: 'Pending', color: 'bg-warning text-warning-foreground' },
+  qualified: { label: 'Qualified', color: 'bg-success text-success-foreground' },
   rejected: { label: 'Rejected', color: 'bg-destructive text-destructive-foreground' },
 } as const;
 

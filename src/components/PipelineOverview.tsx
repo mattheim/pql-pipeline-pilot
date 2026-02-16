@@ -1,13 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePqls } from '@/hooks/use-pqls';
 import { PQL_STATUSES, type PqlStatus } from '@/lib/constants';
-import { Clock, CheckCircle2, Sparkles, Eye, Send, XCircle } from 'lucide-react';
+import { Clock, CheckCircle2, Sparkles, Send, XCircle } from 'lucide-react';
 
 const icons: Record<string, React.ElementType> = {
   pending: Clock,
   qualified: CheckCircle2,
   enriched: Sparkles,
-  ready_for_review: Eye,
   sent: Send,
   rejected: XCircle,
 };
