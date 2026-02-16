@@ -44,13 +44,28 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
                 className={`cursor-pointer ${selectedId === pql.id ? 'bg-accent' : ''}`}
                 onClick={() => onSelect(pql.id)}
               >
-                <TableCell className="font-medium">{pql.company_name || '—'}</TableCell>
-                <TableCell className="text-muted-foreground">{pql.email}</TableCell>
-                <TableCell>{pql.product_usage_score ?? '—'}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {pql.last_active_date ? format(new Date(pql.last_active_date), 'MMM d, yyyy') : '—'}
-                </TableCell>
-                <TableCell><StatusBadge status={pql.status} /></TableCell>
+                {(() => {
+                  const raw = (pql.raw_data || {}) as Record<string, any>;
+                  const lastActiveRaw =
+                    raw['Last Active'] ??
+                    raw.last_active ??
+                    raw.last_active_date ??
+                    null;
+                  const lastActiveDisplay =
+                    lastActiveRaw ??
+                    (pql.last_active_date
+                      ? format(new Date(pql.last_active_date), 'MMM d, yyyy')
+                      : '—');
+                  return (
+                    <>
+                      <TableCell className="font-medium">{pql.company_name || '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{pql.email}</TableCell>
+                      <TableCell>{pql.product_usage_score ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{lastActiveDisplay}</TableCell>
+                      <TableCell><StatusBadge status={pql.status} /></TableCell>
+                    </>
+                  );
+                })()}
               </TableRow>
             ))
           )}
