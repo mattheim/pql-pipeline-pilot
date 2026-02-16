@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInsertPqls } from '@/hooks/use-pqls';
 import { Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
@@ -17,6 +19,11 @@ export function CsvUploader() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [fileName, setFileName] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [singleId, setSingleId] = useState('');
+  const [singleEmail, setSingleEmail] = useState('');
+  const [singleCompany, setSingleCompany] = useState('');
+  const [singleUsage, setSingleUsage] = useState('');
+  const [singleLastActive, setSingleLastActive] = useState('');
   const insertPqls = useInsertPqls();
 
   const handleFile = useCallback((file: File) => {
@@ -56,6 +63,38 @@ export function CsvUploader() {
       toast({
         title: 'Agents API test failed',
         description: e.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const runAgentsQualification = async (inserted: any[]) => {
+    // Send to agents API for qualification
+    try {
+      const response = await fetch(`${AGENTS_API_BASE_URL}/qualify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pqls: inserted }),
+      });
+      if (response.ok) {
+        const results = await response.json();
+        // Update PQLs with qualification results
+        for (const result of results.qualified || []) {
+          await supabase
+            .from('pqls')
+            .update({
+              status: 'qualified',
+              qualification_result: result.qualification_result,
+              agent_metadata: result.agent_metadata,
+            })
+            .eq('id', result.id);
+        }
+        toast({ title: `${results.qualified?.length ?? 0} PQLs qualified` });
+      }
+    } catch {
+      toast({
+        title: 'Agents API not reachable',
+        description: 'PQLs saved but not yet qualified. Start your local API to process them.',
         variant: 'destructive',
       });
     }
@@ -105,33 +144,56 @@ export function CsvUploader() {
       });
 
       const inserted = await insertPqls.mutateAsync(pqlRows);
-
-      // Send to agents API for qualification
-      try {
-        const response = await fetch(`${AGENTS_API_BASE_URL}/qualify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pqls: inserted }),
-        });
-        if (response.ok) {
-          const results = await response.json();
-          // Update PQLs with qualification results
-          for (const result of results.qualified || []) {
-            await supabase.from('pqls').update({
-              status: 'qualified',
-              qualification_result: result.qualification_result,
-              agent_metadata: result.agent_metadata,
-            }).eq('id', result.id);
-          }
-          toast({ title: `${results.qualified?.length ?? 0} PQLs qualified` });
-        }
-      } catch {
-        toast({ title: 'Agents API not reachable', description: 'PQLs saved but not yet qualified. Start your local API to process them.', variant: 'destructive' });
-      }
+      await runAgentsQualification(inserted);
 
       setRows([]);
       setHeaders([]);
       setFileName('');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSingleTestSubmit = async () => {
+    if (!singleEmail || !singleUsage || !singleLastActive) {
+      toast({
+        title: 'Missing fields',
+        description: 'Email, Usage Score, and Last Active are required for a test PQL.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      const rawRow: ParsedRow = {
+        ID: singleId,
+        Email: singleEmail,
+        'Company Name': singleCompany,
+        'Usage Score (1-10)': singleUsage,
+        'Last Active': singleLastActive,
+      };
+
+      const pqlRows = [
+        {
+          email: singleEmail,
+          company_name: singleCompany || null,
+          product_usage_score: Number(singleUsage) || null,
+          // Keep unstructured "Last Active" only in raw_data; qualification agent interprets it.
+          last_active_date: null,
+          raw_data: rawRow as any,
+          status: 'pending' as const,
+        },
+      ];
+
+      const inserted = await insertPqls.mutateAsync(pqlRows as any);
+      await runAgentsQualification(inserted);
+
+      setSingleId('');
+      setSingleEmail('');
+      setSingleCompany('');
+      setSingleUsage('');
+      setSingleLastActive('');
     } finally {
       setProcessing(false);
     }
@@ -158,6 +220,63 @@ export function CsvUploader() {
             <p className="text-xs text-muted-foreground mt-1">Supports .csv files with labeled columns</p>
             <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
           </label>
+        </CardContent>
+      </Card>
+
+      {/* Single test PQL form */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Single Test PQL</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-xs">ID (optional)</Label>
+              <Input
+                value={singleId}
+                onChange={(e) => setSingleId(e.target.value)}
+                placeholder="test-1"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Email</Label>
+              <Input
+                value={singleEmail}
+                onChange={(e) => setSingleEmail(e.target.value)}
+                placeholder="user@example.com"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Company Name</Label>
+              <Input
+                value={singleCompany}
+                onChange={(e) => setSingleCompany(e.target.value)}
+                placeholder="Acme Corp"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Usage Score (1–10)</Label>
+              <Input
+                value={singleUsage}
+                onChange={(e) => setSingleUsage(e.target.value)}
+                placeholder="8"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-xs">Last Active</Label>
+              <Input
+                value={singleLastActive}
+                onChange={(e) => setSingleLastActive(e.target.value)}
+                placeholder="e.g. 2 hours ago, 1 day ago"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" onClick={handleSingleTestSubmit} disabled={processing}>
+              {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {processing ? 'Processing…' : 'Submit Single Test'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

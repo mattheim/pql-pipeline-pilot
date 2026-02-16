@@ -50,7 +50,9 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
       // Call send-email edge function
       const { data: result, error } = await supabase.functions.invoke('send-email', {
-        body: { to: emailDraft.to_email, subject, body, from: 'PQL Command <noreply@yourdomain.com>' },
+        // Omit custom "from" so the edge function can use a verified
+        // default sender (e.g. onboarding@resend.dev) or your configured domain.
+        body: { to: emailDraft.to_email, subject, body },
       });
 
       if (error) throw error;
