@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { usePqlDetail, useUpdatePqlStatus, useUpdateEmailDraft, useLogActivity, 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Send, XCircle, Building2, Users, Sparkles, Trash2 } from 'lucide-react';
+import { AGENTS_API_BASE_URL } from '@/lib/constants';
 
 interface PqlDetailPanelProps {
   pqlId: string;
@@ -20,17 +22,17 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
   const updateDraft = useUpdateEmailDraft();
   const logActivity = useLogActivity();
   const deletePql = useDeletePql();
+  const queryClient = useQueryClient();
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [offer, setOffer] = useState('');
   const [sending, setSending] = useState(false);
+  const [enriching, setEnriching] = useState(false);
 
   useEffect(() => {
     if (data?.emailDraft) {
       setSubject(data.emailDraft.subject);
       setBody(data.emailDraft.body);
-      setOffer(data.emailDraft.proposed_offer ?? '');
     }
   }, [data?.emailDraft]);
 
@@ -39,13 +41,39 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
   const { pql, enrichment, emailDraft } = data;
 
+  const handleRerunEnrichment = async () => {
+    setEnriching(true);
+    try {
+      const resp = await fetch(`${AGENTS_API_BASE_URL}/pqls/${pqlId}/enrich`, {
+        method: 'POST',
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `Status ${resp.status}`);
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['pql', pqlId] }),
+        queryClient.invalidateQueries({ queryKey: ['pqls'] }),
+      ]);
+      toast({ title: 'Enrichment refreshed' });
+    } catch (e: any) {
+      toast({
+        title: 'Failed to re-run enrichment',
+        description: e.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   const handleApproveAndSend = async () => {
     if (!emailDraft) return;
     setSending(true);
     try {
       // Save any edits first
-      if (subject !== emailDraft.subject || body !== emailDraft.body || offer !== (emailDraft.proposed_offer ?? '')) {
-        await updateDraft.mutateAsync({ id: emailDraft.id, subject, body, proposed_offer: offer });
+      if (subject !== emailDraft.subject || body !== emailDraft.body) {
+        await updateDraft.mutateAsync({ id: emailDraft.id, subject, body });
       }
 
       // Call send-email edge function
@@ -95,6 +123,9 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     raw.company_name ||
     raw.company ||
     pql.email;
+  const agentMeta = (pql.agent_metadata || {}) as Record<string, any>;
+  const qualificationReasoning = agentMeta.ai_reasoning as string | undefined;
+  const proposedOffer = emailDraft?.proposed_offer as string | undefined;
 
   return (
     <div className="space-y-4">
@@ -103,7 +134,18 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
           <h2 className="text-lg font-semibold">{companyDisplay}</h2>
           <StatusBadge status={pql.status} />
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRerunEnrichment}
+            disabled={enriching}
+          >
+            <Sparkles className="mr-1 h-3.5 w-3.5" />
+            {enriching ? 'Refreshing…' : 'Re-run enrichment'}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClose}>✕</Button>
+        </div>
       </div>
 
       {/* Enrichment Info */}
@@ -133,13 +175,29 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
         </Card>
       )}
 
-      {/* AI Reasoning */}
-      {emailDraft?.ai_reasoning && (
+      {/* Proposed Offer (read-only) */}
+      {proposedOffer && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4" /> Proposed Offer
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {proposedOffer}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* AI Reasoning (Qualification first, then email if present) */}
+      {(qualificationReasoning || emailDraft?.ai_reasoning) && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5"><Sparkles className="h-4 w-4" /> AI Reasoning</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">{emailDraft.ai_reasoning}</CardContent>
+          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {qualificationReasoning || emailDraft?.ai_reasoning}
+          </CardContent>
         </Card>
       )}
 
@@ -161,10 +219,6 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
             <div>
               <label className="text-xs font-medium text-muted-foreground">Body</label>
               <Textarea value={body} onChange={(e) => setBody(e.target.value)} className="mt-1 min-h-[200px]" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Proposed Offer</label>
-              <Input value={offer} onChange={(e) => setOffer(e.target.value)} className="mt-1" />
             </div>
           </CardContent>
         </Card>
