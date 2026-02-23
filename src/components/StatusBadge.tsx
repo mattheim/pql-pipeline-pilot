@@ -1,6 +1,6 @@
 import { PQL_STATUSES, type PqlStatus } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Clock, X } from 'lucide-react';
+import { CheckCircle2, Clock, Send, X } from 'lucide-react';
 
 export function StatusBadge({ status }: { status: string }) {
   const config = PQL_STATUSES[status as PqlStatus] ?? {
@@ -20,6 +20,9 @@ export function StatusBadge({ status }: { status: string }) {
   } else if (status === 'rejected') {
     Icon = X;
     iconColor = 'text-red-500';
+  } else if (status === 'sent') {
+    Icon = Send;
+    iconColor = 'text-blue-500';
   }
 
   return (

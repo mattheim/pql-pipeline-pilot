@@ -9,7 +9,7 @@ import { usePqlDetail, useUpdatePqlStatus, useUpdateEmailDraft, useLogActivity, 
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Send, XCircle, Building2, Users, Sparkles, Trash2 } from 'lucide-react';
-import { AGENTS_API_BASE_URL } from '@/lib/constants';
+import { AGENTS_API_BASE_URL, getStoredQualificationThreshold } from '@/lib/constants';
 
 interface PqlDetailPanelProps {
   pqlId: string;
@@ -26,6 +26,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
+  const [proposedOffer, setProposedOffer] = useState('');
   const [sending, setSending] = useState(false);
   const [enriching, setEnriching] = useState(false);
 
@@ -33,6 +34,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     if (data?.emailDraft) {
       setSubject(data.emailDraft.subject);
       setBody(data.emailDraft.body);
+      setProposedOffer(data.emailDraft.proposed_offer ?? '');
     }
   }, [data?.emailDraft]);
 
@@ -46,6 +48,10 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     try {
       const resp = await fetch(`${AGENTS_API_BASE_URL}/pqls/${pqlId}/enrich`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          qualification_threshold: getStoredQualificationThreshold(),
+        }),
       });
       if (!resp.ok) {
         const text = await resp.text();
@@ -72,12 +78,21 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     setSending(true);
     try {
       // Save any edits first
-      if (subject !== emailDraft.subject || body !== emailDraft.body) {
-        await updateDraft.mutateAsync({ id: emailDraft.id, subject, body });
+      if (
+        subject !== emailDraft.subject ||
+        body !== emailDraft.body ||
+        proposedOffer !== (emailDraft.proposed_offer ?? '')
+      ) {
+        await updateDraft.mutateAsync({
+          id: emailDraft.id,
+          subject,
+          body,
+          proposed_offer: proposedOffer,
+        });
       }
 
       // Call send-email edge function
-      const { data: result, error } = await supabase.functions.invoke('send-email', {
+      const { error } = await supabase.functions.invoke('send-email', {
         // Omit custom "from" so the edge function can use a verified
         // default sender (e.g. onboarding@resend.dev) or your configured domain.
         body: { to: emailDraft.to_email, subject, body },
@@ -85,8 +100,12 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
       if (error) throw error;
 
-      // Keep status as 'qualified' or 'pending'; sent state is tracked via activity_log
-      await logActivity.mutateAsync({ pql_id: pqlId, action: 'email_sent', details: { to: emailDraft.to_email } });
+      await updateStatus.mutateAsync({ id: pqlId, status: 'sent' });
+      await logActivity.mutateAsync({
+        pql_id: pqlId,
+        action: 'email_sent',
+        details: { to: emailDraft.to_email, subject, proposed_offer: proposedOffer },
+      });
       toast({ title: 'Email sent successfully!' });
       onClose();
     } catch (e: any) {
@@ -97,9 +116,43 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
   };
 
   const handleReject = async () => {
-    await updateStatus.mutateAsync({ id: pqlId, status: 'rejected' });
-    await logActivity.mutateAsync({ pql_id: pqlId, action: 'rejected' });
-    toast({ title: 'Marked as unfit' });
+    const now = new Date().toISOString();
+    const existingMeta =
+      pql.agent_metadata && typeof pql.agent_metadata === 'object'
+        ? (pql.agent_metadata as Record<string, unknown>)
+        : {};
+    const existingTags = Array.isArray(existingMeta.human_tags)
+      ? existingMeta.human_tags.map(String)
+      : [];
+    const nextTags = Array.from(new Set([...existingTags, 'not_ready']));
+
+    const { error } = await supabase
+      .from('pqls')
+      .update({
+        status: 'rejected',
+        agent_metadata: {
+          ...existingMeta,
+          human_tags: nextTags,
+          rejection_label: 'not_ready',
+          rejected_at: now,
+        },
+      })
+      .eq('id', pqlId);
+    if (error) {
+      toast({ title: 'Failed to reject lead', description: error.message, variant: 'destructive' });
+      return;
+    }
+
+    await logActivity.mutateAsync({
+      pql_id: pqlId,
+      action: 'rejected',
+      details: { tag: 'not_ready', tagged_at: now },
+    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['pql', pqlId] }),
+      queryClient.invalidateQueries({ queryKey: ['pqls'] }),
+    ]);
+    toast({ title: 'Marked as Not Ready' });
     onClose();
   };
 
@@ -125,8 +178,6 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
     pql.email;
   const agentMeta = (pql.agent_metadata || {}) as Record<string, any>;
   const qualificationReasoning = agentMeta.ai_reasoning as string | undefined;
-  const proposedOffer = emailDraft?.proposed_offer as string | undefined;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -175,16 +226,20 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
         </Card>
       )}
 
-      {/* Proposed Offer (read-only) */}
-      {proposedOffer && (
+      {/* Proposed Offer Editor */}
+      {emailDraft && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-1.5">
               <Sparkles className="h-4 w-4" /> Proposed Offer
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground whitespace-pre-wrap">
-            {proposedOffer}
+          <CardContent>
+            <Textarea
+              value={proposedOffer}
+              onChange={(e) => setProposedOffer(e.target.value)}
+              className="min-h-[110px]"
+            />
           </CardContent>
         </Card>
       )}
@@ -226,13 +281,13 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
 
       {/* Actions */}
       <div className="flex gap-2">
-        {emailDraft && pql.status !== 'rejected' && (
+        {emailDraft && pql.status === 'qualified' && (
           <Button onClick={handleApproveAndSend} disabled={sending} className="flex-1">
             <Send className="mr-2 h-4 w-4" />
             {sending ? 'Sending…' : 'Approve & Send'}
           </Button>
         )}
-        {pql.status !== 'rejected' && (
+        {pql.status !== 'rejected' && pql.status !== 'sent' && (
           <Button variant="outline" onClick={handleReject} className="flex-1 text-destructive hover:text-destructive">
             <XCircle className="mr-2 h-4 w-4" />
             Reject

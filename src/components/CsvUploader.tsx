@@ -6,7 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInsertPqls } from '@/hooks/use-pqls';
 import { Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
-import { AGENTS_API_BASE_URL } from '@/lib/constants';
+import {
+  AGENTS_API_BASE_URL,
+  getStoredQualificationThreshold,
+  normalizeQualificationThreshold,
+  setStoredQualificationThreshold,
+} from '@/lib/constants';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -24,6 +29,9 @@ export function CsvUploader() {
   const [singleCompany, setSingleCompany] = useState('');
   const [singleUsage, setSingleUsage] = useState('');
   const [singleLastActive, setSingleLastActive] = useState('');
+  const [qualificationThreshold, setQualificationThreshold] = useState<number>(
+    getStoredQualificationThreshold(),
+  );
   const insertPqls = useInsertPqls();
 
   const handleFile = useCallback((file: File) => {
@@ -74,7 +82,10 @@ export function CsvUploader() {
       const response = await fetch(`${AGENTS_API_BASE_URL}/qualify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pqls: inserted }),
+        body: JSON.stringify({
+          pqls: inserted,
+          qualification_threshold: qualificationThreshold,
+        }),
       });
       if (response.ok) {
         const results = await response.json();
@@ -98,6 +109,12 @@ export function CsvUploader() {
         variant: 'destructive',
       });
     }
+  };
+
+  const handleThresholdChange = (rawValue: string) => {
+    const parsed = Number(rawValue);
+    const normalized = setStoredQualificationThreshold(normalizeQualificationThreshold(parsed));
+    setQualificationThreshold(normalized);
   };
 
   const handleImportAndProcess = async () => {
@@ -202,9 +219,23 @@ export function CsvUploader() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={handleTestAgentsApi}>
-          Test Agents API
-        </Button>
+        <div className="flex items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">Qualification Threshold (1-10)</Label>
+            <Input
+              className="w-36"
+              type="number"
+              min={1}
+              max={10}
+              step={1}
+              value={qualificationThreshold}
+              onChange={(e) => handleThresholdChange(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={handleTestAgentsApi}>
+            Test Agents API
+          </Button>
+        </div>
       </div>
 
       {/* Upload Zone */}
