@@ -179,9 +179,9 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
   const agentMeta = (pql.agent_metadata || {}) as Record<string, any>;
   const qualificationReasoning = agentMeta.ai_reasoning as string | undefined;
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
+    <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-lg font-semibold">{companyDisplay}</h2>
           <StatusBadge status={pql.status} />
         </div>
@@ -280,7 +280,7 @@ export function PqlDetailPanel({ pqlId, onClose }: PqlDetailPanelProps) {
       )}
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {emailDraft && pql.status === 'qualified' && (
           <Button onClick={handleApproveAndSend} disabled={sending} className="flex-1">
             <Send className="mr-2 h-4 w-4" />

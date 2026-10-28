@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,6 @@ import {
   normalizeQualificationThreshold,
   setStoredQualificationThreshold,
 } from '@/lib/constants';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 interface ParsedRow {
@@ -33,6 +33,7 @@ export function CsvUploader() {
     getStoredQualificationThreshold(),
   );
   const insertPqls = useInsertPqls();
+  const queryClient = useQueryClient();
 
   const handleFile = useCallback((file: File) => {
     setFileName(file.name);
@@ -87,27 +88,22 @@ export function CsvUploader() {
           qualification_threshold: qualificationThreshold,
         }),
       });
-      if (response.ok) {
-        const results = await response.json();
-        // Update PQLs with qualification results
-        for (const result of results.qualified || []) {
-          await supabase
-            .from('pqls')
-            .update({
-              status: 'qualified',
-              qualification_result: result.qualification_result,
-              agent_metadata: result.agent_metadata,
-            })
-            .eq('id', result.id);
-        }
-        toast({ title: `${results.qualified?.length ?? 0} PQLs qualified` });
+      if (!response.ok) {
+        throw new Error(`Processing returned HTTP ${response.status}. Check the Agents API logs.`);
       }
-    } catch {
+      const results = await response.json();
+      // The API persists qualification, enrichment, and drafts itself.
+      toast({ title: `${results.qualified?.length ?? 0} PQLs qualified` });
+    } catch (error) {
       toast({
-        title: 'Agents API not reachable',
-        description: 'PQLs saved but not yet qualified. Start your local API to process them.',
+        title: 'PQLs saved; processing incomplete',
+        description: `${error instanceof Error ? error.message : 'Could not reach the Agents API.'} Retry enrichment from the dashboard; do not import these rows again.`,
         variant: 'destructive',
       });
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: ['pqls'] });
+      await queryClient.invalidateQueries({ queryKey: ['pql'] });
+      await queryClient.invalidateQueries({ queryKey: ['activity_log'] });
     }
   };
 
@@ -166,6 +162,8 @@ export function CsvUploader() {
       setRows([]);
       setHeaders([]);
       setFileName('');
+    } catch {
+      // useInsertPqls shows the error; retain the CSV so saving can be retried.
     } finally {
       setProcessing(false);
     }
@@ -211,6 +209,8 @@ export function CsvUploader() {
       setSingleCompany('');
       setSingleUsage('');
       setSingleLastActive('');
+    } catch {
+      // useInsertPqls shows the error; preserve the entered values.
     } finally {
       setProcessing(false);
     }

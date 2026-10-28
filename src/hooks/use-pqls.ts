@@ -53,7 +53,13 @@ export function useInsertPqls() {
       qc.invalidateQueries({ queryKey: ['pqls'] });
       toast({ title: 'PQLs imported successfully' });
     },
-    onError: (e) => toast({ title: 'Import failed', description: e.message, variant: 'destructive' }),
+    onError: (e) => toast({
+      title: 'Import failed',
+      description: /failed to fetch|networkerror|load failed/i.test(e.message)
+        ? 'Could not reach the database. Check that your Supabase instance is running and refresh this page. Your CSV is still available to retry.'
+        : e.message,
+      variant: 'destructive',
+    }),
   });
 }
 

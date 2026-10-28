@@ -19,15 +19,15 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading…</div>;
 
   return (
-    <div className="rounded-lg border bg-card shadow-sm">
-      <Table>
+    <div className="review-queue min-w-0 rounded-lg border bg-card shadow-sm">
+      <Table className="table-fixed [overflow-wrap:anywhere]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead>Company</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Score</TableHead>
-            <TableHead>Last Active</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="w-[23%]">Company</TableHead>
+            <TableHead className="w-[30%]">Email</TableHead>
+            <TableHead className="w-[10%]">Score</TableHead>
+            <TableHead className="w-[18%]">Last Active</TableHead>
+            <TableHead className="w-[19%]">Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -41,7 +41,7 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
             filtered.map((pql) => (
               <TableRow
                 key={pql.id}
-                className={`cursor-pointer ${selectedId === pql.id ? 'bg-accent' : ''}`}
+                className={`review-queue-row cursor-pointer ${selectedId === pql.id ? 'bg-accent' : ''}`}
                 onClick={() => onSelect(pql.id)}
               >
                 {(() => {
@@ -66,11 +66,11 @@ export function ReviewQueue({ onSelect, selectedId, statusFilter }: ReviewQueueP
                       : '—');
                   return (
                     <>
-                      <TableCell className="font-medium">{companyDisplay}</TableCell>
-                      <TableCell className="text-muted-foreground">{pql.email}</TableCell>
-                      <TableCell>{pql.product_usage_score ?? '—'}</TableCell>
-                      <TableCell className="text-muted-foreground">{lastActiveDisplay}</TableCell>
-                      <TableCell><StatusBadge status={pql.status} /></TableCell>
+                      <TableCell className="font-medium"><span className="review-queue-label">Company</span>{companyDisplay}</TableCell>
+                      <TableCell className="review-queue-email text-muted-foreground"><span className="review-queue-label">Email</span>{pql.email}</TableCell>
+                      <TableCell><span className="review-queue-label">Score</span>{pql.product_usage_score ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground"><span className="review-queue-label">Last Active</span>{lastActiveDisplay}</TableCell>
+                      <TableCell><span className="review-queue-label">Status</span><StatusBadge status={pql.status} /></TableCell>
                     </>
                   );
                 })()}

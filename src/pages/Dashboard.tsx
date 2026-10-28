@@ -10,7 +10,7 @@ export default function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="dashboard-content min-w-0 space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-bold">Pipeline Overview</h1>
         <p className="text-sm text-muted-foreground">Monitor and manage your PQL pipeline</p>
@@ -18,7 +18,7 @@ export default function Dashboard() {
 
       <PipelineOverview />
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Review Queue</h2>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[180px]">
@@ -33,15 +33,15 @@ export default function Dashboard() {
         </Select>
       </div>
 
-      {/* Layout: ~40% list on the left, ~60% detail on the right */}
-      <div className="grid gap-6 lg:grid-cols-[40%_60%]">
+      {/* Split only when the available content width can accommodate both panels. */}
+      <div className={`dashboard-review-grid grid min-w-0 grid-cols-1 gap-6 ${selectedPql ? 'has-selection' : ''}`}>
         <ReviewQueue
           onSelect={setSelectedPql}
           selectedId={selectedPql}
           statusFilter={statusFilter === 'all' ? undefined : statusFilter}
         />
         {selectedPql && (
-          <div className="lg:sticky lg:top-6 lg:self-start">
+          <div className="dashboard-detail min-w-0">
             <PqlDetailPanel pqlId={selectedPql} onClose={() => setSelectedPql(null)} />
           </div>
         )}
