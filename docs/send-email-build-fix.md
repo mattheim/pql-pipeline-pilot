@@ -1,6 +1,6 @@
 
 
-## Fix: send-email Edge Function Build Error
+# Fix: send-email Edge Function Build Error
 
 The build is failing because of a TypeScript strict error -- the `catch` block uses `error.message` but `error` is typed as `unknown` in strict mode.
 
@@ -20,4 +20,3 @@ In `supabase/functions/send-email/index.ts`, line 52, cast the error properly:
 ```
 
 That single change will resolve the `TS18046` build error and allow the function to deploy successfully.
-

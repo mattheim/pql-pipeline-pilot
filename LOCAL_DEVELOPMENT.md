@@ -14,7 +14,7 @@ npm run db:start
 npm run dev -- --host 127.0.0.1
 ```
 
-In another terminal, from the parent `heim_lovable_gtm` directory:
+In another terminal, from the parent directory containing both repositories:
 
 ```sh
 ./agents_api/.venv/bin/python -m uvicorn agents_api.main:app --reload --port 8000

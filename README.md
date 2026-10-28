@@ -1,73 +1,42 @@
-# Welcome to your Lovable project
+# PQL Command
 
-## Project info
+A pipeline manager for importing product-qualified leads, reviewing qualification
+and enrichment results, and editing outreach drafts.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Development
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Use Node.js 20 or newer and npm. Install the dependencies and start the frontend:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm ci
+npm run dev -- --host 127.0.0.1
 ```
 
-**Edit a file directly in GitHub**
+Open http://127.0.0.1:8080. The complete import and processing workflow also
+requires the database and the companion [PQL Agents API](https://github.com/mattheim/pql-agents-api).
+See [Local development](LOCAL_DEVELOPMENT.md) for configuration and restart
+instructions. Use [sample-pqls.csv](sample-pqls.csv) to test imports.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Commands
 
-**Use GitHub Codespaces**
+```sh
+npm run build     # Production build in dist/
+npm run preview   # Preview the production build locally
+npm test         # Run the test suite
+npm run lint     # Check source code
+npm run db:start # Start the configured local database services
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Stack
 
-## What technologies are used for this project?
+React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and TanStack Query power the
+frontend. Supabase stores pipeline data, and the Python API handles qualification,
+enrichment, and email draft generation.
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Build with `npm run build` and serve `dist/` using a static host configured to
+route application paths to `index.html`. Configure the frontend database URL and
+publishable key for the target environment before building. Set the Agents API
+base URL in `src/lib/constants.ts` to the deployed backend address and configure
+the backend's allowed origins for the frontend domain.
